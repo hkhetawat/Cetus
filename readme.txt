@@ -1,3 +1,6 @@
+******This is not Cetus as distributed in it’s original form by Purdue University at: http://cetus.ecn.purdue.edu. Modifications have been made to the project.******
+
+
 -------------------------------------------------------------------------------
 RELEASE
 -------------------------------------------------------------------------------
