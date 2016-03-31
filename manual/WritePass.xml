@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<chapter xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xmlns:svg="http://www.w3.org/2000/svg"
+      xmlns:mml="http://www.w3.org/1998/Math/MathML"
+      xmlns:html="http://www.w3.org/1999/xhtml"
+      xml:id="Writing-a-Pass">
+    <title>Writing a Pass</title>
+
+    <para>The following sections discuss the interface Cetus provides to pass
+    writers.</para>
+
+    <sect1>
+      <title>Making Cetus Execute Your Pass</title>
+
+      <para>There are two ways to extend Cetus to run a new pass.</para>
+
+      <orderedlist numeration="arabic">
+        <listitem>
+          <para>For passes accepted into the main Cetus distribution, provide
+          a static void <command>run</command> method that accepts a
+          <command>Program</command> object as its only parameter. We will add
+          a flag to Cetus, named similarly to your pass, that will cause the
+          Cetus driver to call your pass.</para>
+        </listitem>
+
+        <listitem>
+          <para>Derive a class from cetus.exec.Driver and override the
+          <command>runPasses</command> method. You must provide your own
+          <command>main</command> method, which should contain a single line:
+          <programlisting>
+public class MyDriver extends Driver
+{
+  // ...
+
+  public static void main(String[] args)
+  {
+    (new MyDriver()).run(args);
+  }
+}
+</programlisting> where <command>args</command> is simply the command line
+          argument of your <command>main</command> method. You can optionally
+          override the <command>printUsage</command> and
+          <command>printHelp</command> methods if your pass has additional
+          command-line options. The Driver class contains a protected
+          <command>Program</command> object that your derived class will be
+          able to access in its <command>runPasses</command> method. Note that
+          the <command>run</command> method called in the example above is the
+          <command>run</command> method of the Driver class. It will process
+          command-line arguments, run the parsers, and get everything ready
+          for your code before calling <command>runPasses</command>.</para>
+        </listitem>
+      </orderedlist>
+    </sect1>
+
+    <sect1>
+      <title>Iterators</title>
+
+      <para>The IRIterator class implements the Java Iterator interface plus
+      some added functionality. The BreadthFirstIterator and
+      DepthFirstIterator iterate over the IR in breadth-first and depth-first
+      order, respectively. The FlatIterator simply iterates over an object's
+      children, and does not perform a "deep" traversal within the children.
+      An IRIterator can be made to skip objects such that it only returns
+      objects of certain types. It can also be made to prune parts of the
+      traversal below objects of certain types.</para>
+
+      <para>IRIterators provide several versions of <command>next</command>
+      that are explained in the examples below. The first example shows how to
+      use the standard <command>next</command>:</para>
+
+      <para><programlisting>
+/* BreadthFirst traversal over everything in a procedure. Assumes proc is a Procedure object. */
+
+BreadthFirstIterator iter = new BreadthFirstIterator(proc);
+while (iter.hasNext())
+{
+  Object o = iter.next();
+  // Do something with the object
+}
+</programlisting></para>
+
+      <para>The next example shows how to locate a particular type of
+      object:</para>
+
+      <para><programlisting>
+/* Look for loops in a procedure.  Assumes proc is a Procedure object. */
+
+BreadthFirstIterator iter = new BreadthFirstIterator(proc);
+try {
+  while (true)
+  {
+    Loop loop = (Loop)iter.next(Loop.class);
+    // Do something with the loop
+  }
+} catch (NoSuchElementException e) {
+}
+</programlisting></para>
+
+      <para>Note the exception handling. <command>next</command> must throw an
+      exception if it cannot find an element of the specified class, because
+      the corresponding <command>hasNext</command> method cannot be
+      implemented. The reason is the iterator would have to actually perform
+      the iteration to determine if there was such a next element, and if
+      true, would need to perform the iteration again to actually return the
+      object. The standard <command>hasNext</command> does not have have this
+      problem because it simply checks if it has reached the end of the list.
+      We think it would be very strange for users if we provided a
+      <command>hasNext</command> method that modified the iterator, and it
+      would be awkward for us to write a <command>hasNext</command> that would
+      look ahead and then undo its changes. Furthermore, that version of
+      <command>hasNext</command> would no longer be a &#920;(1) call, so we chose
+      not to provide it.</para>
+
+      <para>Other versions of <command>next</command> will find an element of
+      a set of classes, or an element that is not of a set of classes.</para>
+
+      <para>The next example shows how to use pruning:</para>
+
+      <para><programlisting>
+/* Look for procedures in a program.  Assumes prog is a Program object. */
+
+BreadthFirstIterator iter = new BreadthFirstIterator(prog);
+iter.pruneOn(Procedure.class);
+
+try {
+  while (true)
+  {
+    Procedure proc = (Procedure)iter.next(Procedure.class);
+    // Do something with the procedure 
+  }
+} catch (NoSuchElementException e) {
+}
+</programlisting></para>
+
+      <para>Instead of obtaining one iterator on the Program object to look
+      for TranslationUnits, and then obtaining another iterator on each
+      TranslationUnit to look for Procedures, it is easier to do a breadth
+      first search on the entire Program. However, it does not make much sense
+      to look for Procedures inside other Procedures, since none of the
+      languages supported by Cetus allow nested Procedures. Therefore,
+      <command>pruneOn</command> tells the iterator to skip anything below a
+      Procedure on the IR tree.</para>
+    </sect1>
+
+    <sect1>
+      <title>Tools</title>
+
+      <para>The cetus.hir package provides a set of utility methods that are
+      used in common operations such as searching the IR, claiming a new
+      symbol, printing various collections, etc. Since version 1.2, these
+      utilities are provided in five different subsets for better user
+      accessibility. Some of these methods are used only internally, hence are
+      not provided as public methods.</para>
+
+      <itemizedlist mark="bullet">
+        <listitem>
+          <para><command>DataFlowTools</command>: Utility methods for
+          detecting used or modified memory accesses</para>
+        </listitem>
+
+        <listitem>
+          <para><command>IRTools</command>: Utility methods for searching
+          specific types of IR objects that appear in the IR tree</para>
+        </listitem>
+
+        <listitem>
+          <para><command>PrintTools</command>: Utility methods that enable
+          pretty printing of collections and user-directed printing of verbose
+          information</para>
+        </listitem>
+
+        <listitem>
+          <para><command>SymbolTools</command>: Utility methods related to
+          Cetus' symbol interface</para>
+        </listitem>
+
+        <listitem>
+          <para><command>Tools</command>: Utility methods for general
+          purpose</para>
+        </listitem>
+      </itemizedlist>
+    </sect1>
+
+    <sect1>
+      <title>Expression Simplifier</title>
+
+      <para>Expression simplifier supports normalization and simplification of
+      expressions. It internally transforms a given expression to a normalized
+      form so that each operand of a commutative and associative operation is
+      located at the same height in the tree representation; in other words,
+      it converts a binary tree to a n-ary tree. This internal representation
+      makes the simplification algorithm easier and the result of the
+      simplification is converted back to the original internal representation
+      of Cetus.</para>
+
+      <para>Like its predecessor Polaris, a key feature of Cetus is the
+      ability to reason about the represented program in symbolic terms. For
+      example, compiler analyses and optimizations at the source level often
+      require the expressions in the program to be in a simplified form. A
+      specific example is data dependence analysis that collects the
+      coefficients of affine subscript expressions, which are passed to the
+      underlying data dependence test package. Cetus has functionalities that
+      ease the manipulation of expressions for pass writers. The following
+      example shows how to invoke the simplifier. The simplifier returns a new
+      copy of the original expression that was converted to a normalized
+      form.</para>
+
+      <programlisting>
+ import cetus.hir.*;
+ ...
+ Expression e = ...
+ e = Symbolic.simplify(e);
+ </programlisting>
+
+      <para>It is also possible for users to invoke individual simplification
+      technique for their own purposes. The following examples show the
+      functionality of the individual simplification technique. See the
+      javadoc page or the source code to learn how to invoke each technique
+      individually. <screen>
+ 1+2*a+4-a --&gt; 5+a (folding)
+ a*(b+c) --&gt; a*b+a*c (distribution)
+ (a*2)/(8*c) --&gt; a/(4*c) (division)
+ </screen></para>
+    </sect1>
+
+    <sect1>
+      <title>Modifying IR</title>
+
+      <para>Modifying the IR is efficiently done through the API provided for
+      the Cetus IR. The API provides complete abstraction to the pass writer,
+      and construct specific API help in making the pass writer's job
+      easier.</para>
+
+      <para>More details about modifying the IR will be added to this manual
+      in the near future. We currently suggest that you refer to the IR
+      manipulation information in the Cetus tutorials available at
+      http://cetus.ecn.purdue.edu. Please get in touch with us for further
+      support.</para>
+    </sect1>
+
+    <sect1>
+      <title>Printing</title>
+
+      <para>A major complaint about early versions of Cetus was that the
+      printing of IR was not flexible enough. To solve this problem, we have
+      made printing completely customizable by the pass writer. Nearly all
+      classes implement a <varname>Printable</varname> interface, which means
+      they provide a <varname>print</varname> method for printing themselves
+      as source code. By default, this <varname>print</varname> method calls a
+      static method of the same class, called <varname>defaultPrint</varname>.
+      The call is made by invoking a Java <varname>Method</varname> object,
+      which is similar to a function pointer in C. The
+      <varname>Method</varname> object can be changed by calling
+      <varname>setPrintMethod</varname> and passing it a different printing
+      routine. <varname>setPrintMethod</varname> allows a pass writer to
+      change how one particular object prints itself. If the pass writer
+      notices that they are calling this method frequently for the same type
+      of object, then it may be easier to call
+      <varname>setClassPrintMethod</varname>, a static method which causes all
+      newly created objects of a particular class to use the provided printing
+      routine.</para>
+    </sect1>
+  </chapter>

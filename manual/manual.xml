@@ -1,0 +1,104 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<book xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xmlns:svg="http://www.w3.org/2000/svg"
+      xmlns:mml="http://www.w3.org/1998/Math/MathML"
+      xmlns:html="http://www.w3.org/1999/xhtml"
+      version="5.0" xml:id="cetus_manual">
+  <info>
+    <title>The Cetus Compiler Manual</title>
+
+    <authorgroup>
+      <author>
+        <firstname>Cetus Team</firstname>
+
+        <affiliation>
+          <orgname>Purdue University</orgname>
+
+          <orgdiv>ParaMount Research Group</orgdiv>
+
+          <address><email>cetus@ecn.purdue.edu</email></address>
+        </affiliation>
+      </author>
+    </authorgroup>
+
+    <copyright>
+      <year>2004-2011</year>
+
+      <holder>ParaMount Research Group, Purdue University</holder>
+    </copyright>
+    
+    <abstract>
+      <para>Cetus is a source-to-source parallelizing compiler for ISO/ANSI C. It
+      can run on any system supporting <command
+      xlink:href="http://www.oracle.com/technetwork/java/javase/downloads/index.html">Oracle's
+      Java Runtime Environment, Standard Edition</command> 6 or later. If you
+      are referring to a printed version of this document, the most recent
+      version can be found at http://cetus.ecn.purdue.edu/. You can view this
+      manual as a single HTML file <command
+      xlink:href="manual.html">here</command>. </para>
+    </abstract>
+  </info>
+
+  <part xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xmlns:svg="http://www.w3.org/2000/svg"
+      xmlns:mml="http://www.w3.org/1998/Math/MathML"
+      xmlns:html="http://www.w3.org/1999/xhtml"
+      version="5.0" xml:id="part_i">
+    <title>Overview</title>
+<!--
+    <partintro>
+	  <section>
+	  <title>Description</title>
+	  This is an overview.
+	  </section>
+	</partintro>
+-->
+	<xi:include href="Introduction.xml"/>
+    <xi:include href="Background.xml"/>
+    <xi:include href="License.xml"/>
+  </part>
+  <part xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xmlns:svg="http://www.w3.org/2000/svg"
+      xmlns:mml="http://www.w3.org/1998/Math/MathML"
+      xmlns:html="http://www.w3.org/1999/xhtml"
+      version="5.0" xml:id="part_ii">
+    <title>Users Guide</title>
+    <xi:include href="Obtain.xml"/>
+    <xi:include href="Compile.xml"/>
+    <xi:include href="CommandLine.xml"/>
+    <xi:include href="Passes.xml"/>
+  </part>
+  <part xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xmlns:svg="http://www.w3.org/2000/svg"
+      xmlns:mml="http://www.w3.org/1998/Math/MathML"
+      xmlns:html="http://www.w3.org/1999/xhtml"
+      version="5.0" xml:id="part_iii">
+    <title>Developers Guide</title>
+    <xi:include href="Architecture.xml"/>
+    <xi:include href="WritePass.xml"/>
+  </part>
+  <!--
+<chapter id="Examples">
+<title>Examples</title>
+<para></para>
+</chapter>
+
+<chapter id="Glossary">
+<title>Glossary</title>
+<para></para>
+</chapter>
+
+
+<index id="Index">
+<title>Index</title>
+</index>
+-->
+</book>

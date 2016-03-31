@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<chapter xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xmlns:svg="http://www.w3.org/2000/svg"
+      xmlns:mml="http://www.w3.org/1998/Math/MathML"
+      xmlns:html="http://www.w3.org/1999/xhtml"
+      xml:id="Introduction">
+    <title>Introduction</title>
+
+    <para>Parallelizing compiler technology is most mature for the Fortran 77
+    language. The simplicity of the language without pointers or user-defined
+    types makes it easy to analyze and to develop many advanced compiler
+    passes. By contrast, parallelization technology for modern languages, such
+    as Java, C++, or even C, is still in its infancy. When trying to engage in
+    such research, we were faced with a serious challenge. We were unable to
+    find a parallelizing compiler infrastructure that supports interprocedural
+    analysis, exhibits state-of-the-art software engineering techniques to
+    achieve shorter development time, and which would allow us to compile
+    large, realistic applications. However, we feel these properties are of
+    paramount importance. They enable a compiler writer to develop "production
+    strength" passes. Production strength passes, in turn, can work in the
+    context of the most up-to-date compiler technology and lead to compiler
+    research that can be evaluated with full suites of realistic applications.
+    Many people have observed and criticized the lack of such thorough
+    evaluations in current research papers. The availability of an easy-to-use
+    compiler infrastructure would help improve this situation significantly.
+    Hence, continuous research and development in this area are among the most
+    important tasks of the compiler community. Cetus contributes to this
+    effort.</para>
+ </chapter>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<chapter xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xmlns:svg="http://www.w3.org/2000/svg"
+      xmlns:mml="http://www.w3.org/1998/Math/MathML"
+      xmlns:html="http://www.w3.org/1999/xhtml"
+      xml:id="License">
+    <title>License</title>
+
+    <para>In recent years, there has been an explosion in the number of
+    open-source licenses, and we do not wish to contribute further to that
+    problem, but this was the only license upon which all involved parties
+    were able to agree. We suggest that you do not use this license for
+    projects that do not involve Cetus.</para>
+
+    <para>The Cetus License is a modified Artistic License, similar to the
+    Perl Artistic License. Artistic Licenses are generally <command
+    xlink:href="http://www.opensource.org">OSI</command> approved, although
+    this specific license has not been submitted to OSI. You can view the
+    license on the download page <command
+    xlink:href="http://cetus.ecn.purdue.edu/download.html">
+    here</command>.</para>
+  </chapter>

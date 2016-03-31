@@ -1,0 +1,187 @@
+<project name="cetus" default="build" basedir=".">
+
+  <!-- Source directory -->
+  <property name="srcdir" value="src"/>
+
+  <!-- Class directory -->
+  <property name="classdir" value="class"/>
+
+  <!-- Jar directory -->
+  <property name="jardir" value="lib"/>
+
+  <!-- Wrapper directory -->
+  <property name="bindir" value="bin"/>
+
+  <!-- Javadoc directory -->
+  <property name="apidir" value="api"/>
+   
+  <!-- cetus.jar path -->
+  <path id="cetus.jar.path">
+    <pathelement location="lib/cetus.jar"/>
+  </path>
+
+  <!-- Project Classpath -->
+  <path id="project.class.path">
+    <pathelement location="${classdir}"/>
+    <pathelement location="${jardir}/antlr.jar"/>
+	<pathelement location="${jardir}/checkstyle.jar"/>
+  </path>
+
+  <!-- Checkstyle Classpath -->
+  <path id="checkstyle.class.path">
+	<pathelement location="${jardir}/checkstyle.jar"/>
+  </path>
+  
+  <!-- Compiles the source codes -->
+  <target name="compile" depends="parser" description="Compile cetus source code">
+    <mkdir dir="${classdir}"/>
+    <javac
+      srcdir    = "${srcdir}"
+	  includes  = "cetus/**/*.java"
+	  excludes  = "cetus/**/treewalker/*.java"
+	  destdir   = "${classdir}"
+      debug     = "true"
+      includeAntRuntime = "false"
+      source    = "1.6"
+      target    = "1.6"
+    >
+	  <classpath refid="project.class.path"/>
+      <compilerarg value="-Xlint"/>
+      <compilerarg value="-Xlint:-serial"/>
+      <compilerarg line="-Xmaxwarns 10000"/>
+    </javac>
+  </target>
+
+  <!-- Compiles the source codes using ECJ -->
+  <target name="ecj" depends="parser" description="Compile Cetus source codeusing ecj compiler">
+    <mkdir dir="${classdir}"/>
+    <javac
+      compiler = "org.eclipse.jdt.core.JDTCompilerAdapter"
+      srcdir    = "${srcdir}"
+      includes  = "cetus/**/*.java"
+	  excludes  = "cetus/**/treewalker/*.java"
+      destdir   = "${classdir}"
+      debug     = "true"
+      includeAntRuntime = "false"
+      source    = "1.6"
+      target    = "1.6"
+    >
+      <classpath refid="project.class.path"/>
+      <compilerarg line="-maxProblems 200"/>
+      <compilerarg line="-warn:-unchecked,-raw"/>
+      <!-- <compilerarg line="-log ecj.txt"/> -->
+    </javac>
+  </target>
+
+
+  <!-- Generates the parser from the grammar file -->
+  <target name="parser" description="Create parser source file from antlr grammar file">
+    <antlr target = "${srcdir}/cetus/base/grammars/Pre.g">
+	  <classpath refid="project.class.path"/>
+	</antlr>
+    <antlr target = "${srcdir}/cetus/base/grammars/NewCParser.g">
+	  <classpath refid="project.class.path"/>
+	</antlr>
+  </target>
+
+  <!-- Archives the compiled class files -->
+  <target name="build" depends="compile" description="Create Cetus jar file">
+    <mkdir dir = "${jardir}"/>
+    <jar
+      destfile = "${jardir}/cetus.jar"
+      basedir  = "${classdir}"
+      includes = "cetus/**/*.class"
+      compress = "true"
+	  level    = "9"
+    >
+      <manifest>
+	    <attribute name="Class-Path" value="antlr.jar"/>
+        <attribute name="Main-Class" value="cetus.exec.Driver"/>
+      </manifest>
+    </jar>
+  </target>
+  
+  <!-- Rebuild Cetus Jar from stratch -->
+  <target name="rebuild" depends="cleanup,build" description="Cleanup and rebuild Cetus jar file">
+  </target>
+
+  <!-- Creates javadoc -->
+  <target name="javadoc" description="Create Cetus javadoc documention">
+    <mkdir dir = "${apidir}"/>
+    <javadoc destdir   = "${apidir}">
+      <classpath refid="project.class.path"/>
+      <fileset dir="${srcdir}" includes="**/*.java"/>
+    </javadoc>
+  </target>
+
+  <condition property="isWindows">
+    <os family="windows"/>
+  </condition>
+
+  <condition property="isUnix">
+    <os family="unix"/>
+  </condition>
+
+  <target name="bin" depends="build, unixbin, winbin" description="Generate Cetus run script">
+  </target>
+
+  <target name="unixbin" if="isUnix">
+    <mkdir dir = "${bindir}"/>
+    <echo file = "${bindir}/cetus">#!/bin/sh
+# This file was generated automatically by ant.
+java -server -Xverify:none -Xms128m -Xmx512m -jar ${toString:cetus.jar.path} $*
+    </echo>
+    <chmod file="${bindir}/cetus" perm="755"/>
+  </target>
+
+  <target name="winbin" if="isWindows">
+    <mkdir dir = "${bindir}"/>
+    <echo file = "${bindir}/cetus.bat">
+@REM This file was generated automatically by ant.
+@java -server -Xverify:none -Xms128m -Xmx512m -jar "${toString:cetus.jar.path}" %*
+    </echo>
+  </target>
+  
+
+  <taskdef 
+    resource="checkstyletask.properties"
+	classpathref="checkstyle.class.path"
+  />  
+  
+  <target name="checkstyle" description="Run checkstyle tool on Cetus source file">
+    <checkstyle 
+	  config    = "cetus_checks.xml"
+	>
+      <fileset dir="${srcdir}" includes="cetus/hir/*.java"/>
+	  <formatter type="xml" toFile="checkstyle_errors.xml"/>
+    </checkstyle>
+  </target>
+
+
+  <target name="cleanup" depends="clean ,clean-parser" description="Remove all auto generated files">
+  </target>
+
+  <!-- Cleans up class files -->
+  <target name="clean" description="Remove all auto generated files except parser source files">
+    <delete file="${jardir}/cetus.jar"/>
+	<delete dir="${classdir}"/>
+	<delete dir="${bindir}"/>
+  </target>
+
+  <target name="clean-parser" description="Remove auto generated parser source files">
+    <!-- Delete antlr generated files -->
+    <delete file="src/cetus/base/grammars/PreCParser.java"/>
+    <delete file="src/cetus/base/grammars/PreCLexer.smap"/>
+    <delete file="src/cetus/base/grammars/NewCParser.java"/>
+    <delete file="src/cetus/base/grammars/NewCLexer.smap"/>
+    <delete file="src/cetus/base/grammars/NEWCTokenTypes.txt"/>
+    <delete file="src/cetus/base/grammars/NEWCTokenTypes.java"/>
+    <delete file="src/cetus/base/grammars/PreCParser.smap"/>
+    <delete file="src/cetus/base/grammars/NewCParser.smap"/>
+    <delete file="src/cetus/base/grammars/PreCLexer.java"/>
+    <delete file="src/cetus/base/grammars/PreCParserTokenTypes.txt"/>
+    <delete file="src/cetus/base/grammars/NewCLexer.java"/>
+    <delete file="src/cetus/base/grammars/PreCParserTokenTypes.java"/>
+  </target>
+
+</project>

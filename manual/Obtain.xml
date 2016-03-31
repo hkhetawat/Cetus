@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<chapter xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xmlns:svg="http://www.w3.org/2000/svg"
+      xmlns:mml="http://www.w3.org/1998/Math/MathML"
+      xmlns:html="http://www.w3.org/1999/xhtml"
+      xml:id="Obtaining-Cetus">
+    <title>Obtaining Cetus</title>
+
+    <para>Cetus is a set of intermediate representation (IR) classes and
+    optimization passes. It currently has a built-in C parser written in
+    Antlr. Thus, there are two items you need to obtain for full
+    functionality.</para>
+
+    <para><itemizedlist mark="bullet">
+        <listitem>
+          <para>The intermediate representation and compiler passes. These are
+          written in Java.</para>
+        </listitem>
+
+        <listitem>
+          <para><command xlink:href="http://www.antlr2.org">ANTLR
+          v2</command></para>
+        </listitem>
+
+        <!--
+  <listitem>
+    <para>A separate parser for a language supported by Cetus: C or C++.  The parser must
+          produce parse-tree output formatted as
+          <ulink url="http://www.graphviz.org">graphviz</ulink> files.
+    </para>
+  </listitem>
+  -->
+      </itemizedlist></para>
+
+    <para>The IR and passes are available at the <command
+    xlink:href="http://cetus.ecn.purdue.edu">Cetus Project page</command>.
+    This part runs on any system supporting a Java run-time environment, and
+    is covered by the above license. It is available now. The contents of the
+    released version are as follows. More details can be found in the 'readme'
+    file included with the release.</para>
+
+    <para><itemizedlist mark="bullet">
+        <listitem>
+          <para>src - Source code for the Intermediate Representation (IR),
+          optimization and analysis passes.</para>
+        </listitem>
+
+        <listitem>
+          <para>lib - Archived classes (jar)</para>
+        </listitem>
+
+        <listitem>
+          <para>api - JAVA documentation</para>
+        </listitem>
+      </itemizedlist></para>
+<!--
+    <para>Cetus relies on separate parsers to work with languages such as C++
+    that are not supported. In order to work with C++, the user must obtain
+    this external parser. The parser must produce parse-tree output formatted
+    as <command xlink:href="http://www.graphviz.org">graphviz</command>
+    files.</para>
+-->
+</chapter>

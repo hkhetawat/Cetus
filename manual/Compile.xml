@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<chapter xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xmlns:svg="http://www.w3.org/2000/svg"
+      xmlns:mml="http://www.w3.org/1998/Math/MathML"
+      xmlns:html="http://www.w3.org/1999/xhtml"
+      xml:id="Compiling-Cetus">
+    <title>Building Cetus</title>
+
+    <para>The following tools are useful to compile Cetus. You do not need
+    them to use Cetus if you have a Cetus JAR file, although it is normally
+    more useful for compiler writers to modify Cetus.</para>
+
+    <itemizedlist mark="bullet">
+      <listitem>
+        <para>A Java compiler. Oracles's Java compiler, version 1.6.0 or
+        later, is recommended, because that is what we use.</para>
+      </listitem>
+
+      <listitem>
+        <para><command xlink:href="http://www.antlr2.org">ANTLR
+        v2</command></para>
+      </listitem>
+    </itemizedlist>
+
+    <para>The organization of the directories has changed since the last
+    release and there are several options for building Cetus.</para>
+
+    <itemizedlist mark="bullet">
+      <listitem>
+        <para>For Apache Ant users: The provided build.xml defines the build
+        targets for Cetus. The available targets are "compile", "jar", "clean"
+        and "javadoc". Users need to edit the location of the Antlr
+        tool.</para>
+      </listitem>
+
+      <listitem>
+        <para>For Linux/Unix command line users: Run the script build.sh after
+        defining system-dependent variables in the script.</para>
+      </listitem>
+
+      <listitem>
+        <para>For SDK (Eclipse, Netbeans, etc) users: Follow the instructions
+        of each SDK.</para>
+      </listitem>
+    </itemizedlist>
+  </chapter>

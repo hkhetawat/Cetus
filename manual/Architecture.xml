@@ -1,0 +1,376 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<chapter xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xmlns:svg="http://www.w3.org/2000/svg"
+      xmlns:mml="http://www.w3.org/1998/Math/MathML"
+      xmlns:html="http://www.w3.org/1999/xhtml"
+      xml:id="Architecture-of-Cetus">
+    <title>Architecture of Cetus</title>
+
+    <sect1 xml:id="Front-End">
+      <title>Front End</title>
+
+      <sect2>
+        <title>Integrated Parsers</title>
+
+        <para>Cetus is written in Java, so it is natural to use ANTLR to
+        generate parsers whenever possible. Cetus comes with an ANTLR parser
+        for C. We determined that ANTLR cannot be used for C++. We are aware
+        that there is a C++ grammar on the ANTLR website, but it is incomplete
+        and we wanted a grammar that matched the standard grammar in
+        Stroustrup's book as much as possible.</para>
+      </sect2>
+
+      <sect2>
+        <title>Separate Parsers</title>
+
+        <para>Parsing intentionally was separated from the IR-building methods
+        in the high-level interface so that other front ends could be added
+        independently. Some front ends may require more effort than others.
+        For example, writing a parser for C++ is a challenge because its
+        grammar does not fit easily into any of the grammar classes supported
+        by standard generators. The GNU C++ compiler was able to use an
+        LALR(1) grammar, but it looks nothing like the ISO C++ grammar. If any
+        rules must be rearranged to add actions in a particular location, it
+        must be done with extreme care to avoid breaking the grammar. Another
+        problem is C++ has much more complicated rules than C as far as
+        determining which symbols are identifiers versus type names, requiring
+        substantial symbol table maintenance while parsing.</para>
+      </sect2>
+
+      <sect2>
+        <title>Handling Pragmas and Comments</title>
+
+        <para>Pragmas and Comments are identified during scanning as
+        "Annotation"-type IR. These are inserted by the parser into the IR as
+        PreAnnotation(s). Comments are inserted as they appear in the program,
+        except for when they appear in the middle of another IR construct,
+        such as an AssignmentStatement. In this case, they appear in the
+        output before the corresponding statement. For comments that are at
+        the end of code on the same line, they appear AFTER the same line in
+        the output.</para>
+
+        <para>Since v1.1, Cetus adopts a new Annotation implementation in
+        order to simplify the IR associated with different types of
+        annotations as we begin to accommodate more types. Once PreAnnotations
+        are parsed in and stored in the IR, the AnnotationParser converts
+        these into specific IR as described in the Annotations section later
+        in this manual. PragmaAnnotations can be associated with specific
+        statements, knowing their semantics, and hence this is done
+        automatically by Cetus thus allowing movement of annotations with
+        corresponding IR during transformations. However, in the case of
+        CommentAnnotations and other possibly new annotations interpreted as
+        comments, Cetus can only store them as stand-alone annotations thus
+        preventing their movement with corresponding IR.</para>
+
+        <para>More details about the exact Annotation implementation is found
+        in the IR section.</para>
+      </sect2>
+    </sect1>
+
+    <sect1 xml:id="Intermediate-Representation">
+      <title>Intermediate Representation</title>
+
+      <para>Cetus' IR contrasts with the Polaris Fortran translator's IR in
+      that it uses a hierarchical statement structure. The Cetus IR directly
+      reflects the block structure of a program. Polaris lists the statements
+      of each procedure in a flat way, with a reference to the outer statement
+      being the only way for determining the block structure. There are also
+      important differences in the representation of expressions, which
+      further reflects the differences between C and Fortran. The Polaris IR
+      includes assignment statements, whereas Cetus represents assignments in
+      the form of expressions. This corresponds to the C language's feature to
+      include assignment side effects in any expression.</para>
+
+      <para>The IR is structured such that the original source program can be
+      reproduced, but this is where source-to-source translators face an
+      intrinsic dilemma. Keeping the IR and output similar to the input will
+      make it easy for the user to recognize the transformations applied by
+      the compiler. On the other hand, keeping the IR language independent
+      leads to a simpler compiler architecture, but may make it impossible to
+      reproduce the original source code as output. In Cetus, the concept of
+      statements and expressions are closely related to the syntax of the C
+      language, facilitating easy source-to-source translation. However, the
+      drawback is increased complexity for pass writers (since they must think
+      in terms of C syntax) and limited extensibility of Cetus to additional
+      languages. That problem is mitigated by the provision of several
+      abstract classes, which represent generic control constructs. Generic
+      passes can then be written using the abstract interface, while more
+      language-specific passes can use the derived classes. We feel it is
+      important to work with multiple languages at an early stage, so that our
+      result is not simply a design that is extensible in theory but also in
+      practice. Toward this goal, we have begun adding a C++ front end and
+      generalizing the IR so that we can evaluate these design trade-offs.
+      Other potential front ends are Java and Fortran 90.</para>
+
+      <sect2>
+        <title>Class Hierarchy Design</title>
+
+        <para>Our design goal was a simple IR class hierarchy easily
+        understood by users. It should also be easy to maintain, while being
+        rich enough to enable future extension without major modification. The
+        basic building blocks of a program are the translation units, which
+        represent the content of a source file, and procedures, which
+        represent individual functions. Procedures include a list of simple or
+        compound statements, representing the program control flow in a
+        hierarchical way. That is, compound statements, such as IF-constructs
+        and FOR-loops include inner (simple or compound) statements,
+        representing then and else blocks or loop bodies, respectively.
+        Expressions represent the operations being done on variables,
+        including the assignments to variables.</para>
+      </sect2>
+
+      <sect2>
+        <title>Major Classes</title>
+
+        <para>All of the classes are documented in detail with javadoc. The
+        API can be found at http://cetus.ecn.purdue.edu/ in the Documentation
+        section.</para>
+
+        <para>A brief discussion of important base classes is below.</para>
+
+        <sect3>
+          <title>Program</title>
+
+          <para>A Program object represents the entire program. It is the root
+          of the syntax tree.</para>
+        </sect3>
+
+        <sect3>
+          <title>TranslationUnit</title>
+
+          <para>A TranslationUnit represents a single source file. It may only
+          appear as the immediate child of the Program.</para>
+        </sect3>
+
+        <sect3>
+          <title>Declarations</title>
+
+          <para>Declarations appear in many places. As children of
+          TranslationUnit, they represent global declarations of variables,
+          functions, or classes. As parameters of a Procedure, they represent
+          declarations of formal parameters. As children of ClassDeclaration,
+          they representmethods and data members.</para>
+        </sect3>
+
+        <sect3>
+          <title>Expressions</title>
+
+          <para>Expressions are normally of most interest to optimization
+          passes. All assignments, function calls, and mathematical
+          computations are Expressions.</para>
+        </sect3>
+
+        <sect3>
+          <title>Statements</title>
+
+          <para>Statements serve two purposes: to provide control constructs,
+          and to provide wrappers for Declarations and Expressions. Statements
+          such as IfStatement provide a control construct, whereas
+          DeclarationStatement and ExpressionStatement simply allow
+          Declarations and Expressions to appear wherever a Statement may
+          appear.</para>
+        </sect3>
+
+        <sect3>
+          <title>Specifiers</title>
+
+          <para>Specifiers are most often found in lists. For example, a
+          variable declaration may be prefixed with a list of specifiers such
+          as <varname>const</varname> and <varname>float</varname>.</para>
+        </sect3>
+      </sect2>
+
+      <sect2>
+        <title>Relationship Between Grammar and IR</title>
+
+        <para>When designing any class hierarchy, some general principles are
+        followed. The main principle is that a derived class satisfies an
+        <wordasword>is a</wordasword> relationship with its parent, such that
+        the data and methods of the parent make sense in the context of the
+        child. This principle is followed to some extent in Cetus, but it
+        would be more accurate to say that a derived class can appear in the
+        grammar wherever its parent can appear.</para>
+
+        <para>There is a distinction between the class hierarchy and the
+        syntax tree. For example, in the syntax tree, the parent of a
+        TranslationUnit is a Program, however neither TranslationUnit nor
+        Program have a parent in the class hierarchy.</para>
+      </sect2>
+
+      <sect2>
+        <title>Syntax Tree Invariants</title>
+
+        <para>One important aspect that makes an infrastructure useful is
+        providing a good set of tools to help debug future compiler passes.
+        Cetus provides basic debugging support through the Java language,
+        which contains exceptions and assertions as built-in features. Cetus
+        executes within a Java virtual machine, so a full stack trace
+        including source line numbers is available whenever an exception is
+        caught or the compiler terminates abnormally.</para>
+
+        <para>Such error reporting is useless unless the IR is designed to
+        prevent programmers from corrupting the program representation. In
+        other words, there must be a way of detecting the state of the IR is
+        not as it should be, in order to report an error. To provide error
+        checking and detect common errors by pass writers, the Cetus IR
+        maintains several invariants. Violating one of the invariants below
+        will <wordasword>probably</wordasword> result in an exception, to the
+        extent that it is possible for Cetus to recognize what you have
+        done.</para>
+
+        <para>Invariant</para>
+
+        <orderedlist numeration="arabic">
+          <listitem>
+            <para>If an object has a parent, then it has exactly one
+            parent.</para>
+          </listitem>
+        </orderedlist>
+
+        <para>Consequences</para>
+
+        <itemizedlist mark="bullet">
+          <listitem>
+            <para>You may not take an object that has a parent and add it as
+            the child of another object.</para>
+          </listitem>
+
+          <listitem>
+            <para>If you want to use the same object in more than one place in
+            the syntax tree, you must clone the original object.</para>
+          </listitem>
+
+          <listitem>
+            <para>Clones are identical to the originals except their parent is
+            null.</para>
+          </listitem>
+        </itemizedlist>
+
+        <para>Invariant</para>
+
+        <orderedlist continuation="continues" numeration="arabic">
+          <listitem>
+            <para>An object <varname>P</varname> can enumerate all of its
+            children.</para>
+          </listitem>
+        </orderedlist>
+
+        <para>Consequences</para>
+
+        <itemizedlist mark="bullet">
+          <listitem>
+            <para>An iterator object can be created with <varname>P</varname>
+            that can iterate over <varname>P</varname>'s children. In some
+            cases, the iterator will not visit data that is actually part of
+            <varname>P</varname> itself. Nearly everything is kept in the list
+            of children, and we may more move data into the list in the
+            future.</para>
+          </listitem>
+        </itemizedlist>
+
+        <para>Invariant</para>
+
+        <orderedlist continuation="continues" numeration="arabic">
+          <listitem>
+            <para>An object <varname>P</varname> controls the addition and
+            removal of its children.</para>
+          </listitem>
+        </orderedlist>
+
+        <para>Consequences</para>
+
+        <itemizedlist mark="bullet">
+          <listitem>
+            <para>An object <varname>C</varname> cannot become the child of an
+            object <varname>P</varname> without <varname>P</varname>'s
+            permission.</para>
+          </listitem>
+
+          <listitem>
+            <para>Before an object <varname>C</varname> can set its parent
+            reference to an object <varname>P</varname>, <varname>P</varname>
+            must already recognize <varname>C</varname> is a child. I.e.
+            <varname>C</varname> must already be in the list of
+            <varname>P</varname>'s children.</para>
+          </listitem>
+
+          <listitem>
+            <para>The child reference and parent reference (i.e. downlink and
+            uplink) must be set in that order. The <varname>addXYZ</varname>
+            methods of many classes will take care of this for you. There are
+            also atomic swap methods that respect the ordering.</para>
+          </listitem>
+        </itemizedlist>
+      </sect2>
+
+      <sect2>
+        <title>Annotations</title>
+
+        <para>Cetus extends our initial implementation of Annotations to a
+        completely new IR structure and API. Comments, pragmas and other
+        annotations were initially parsed in as Annotations and enclosed
+        inside DeclarationStatements (in most cases). In the new
+        implementation, parsed in annotations are converted to a new internal
+        representation through the AnnotationParser. The AnnotationParser
+        stores annotations under corresponding subclasses: <itemizedlist
+            mark="bullet">
+            <listitem>
+              <para>PragmaAnnotation <itemizedlist mark="circle">
+                  <listitem>
+                    <para>CetusAnnotation (#pragma cetus ...)</para>
+                  </listitem>
+
+                  <listitem>
+                    <para>OmpAnnotation (#pragma omp ...)</para>
+                  </listitem>
+                </itemizedlist></para>
+            </listitem>
+
+            <listitem>
+              <para>CommentAnnotation (e.g. /* ... */)</para>
+            </listitem>
+
+            <listitem>
+              <para>CodeAnnotation (Raw printing)</para>
+            </listitem>
+          </itemizedlist></para>
+
+        <para>Annotations can be attached to existing IR where the semantics
+        define so or can be inserted as stand-alone IR. In the above mentioned
+        subclasses, Cetus and Omp Annotations have specific semantics and
+        hence if present in the input source, they are attached to
+        corresponding source IR. However, this is not possible for Comments as
+        it is difficult to determine their association with the IR except for
+        in certain cases (which are not handled currently). Hence, all
+        Comments and other annotations are inserted as stand-alone.</para>
+
+        <para>Annotations that need to be attached to existing IR are stored
+        as member objects of this <literal>Annotatable</literal> IR
+        (Statements and Declarations), the new API for manipulating these is
+        hence available through Annotatable. Standalone annotations are
+        enclosed in special IR such as
+        <literal>AnnotationDeclaration</literal> or
+        <literal>AnnotationStatement</literal> (note that AnnotationStatement
+        is different from previous release). The API in Annotatable
+        *COMPLETELY REPLACES* previous functionality provided through
+        Tools.java.</para>
+
+        <para>See the latest Cetus tutorial at http://cetus.ecn.purdue.edu for
+        examples on how to use the new Annotation and Annotatable API during
+        analysis and transformations.</para>
+      </sect2>
+    </sect1>
+
+    <sect1 xml:id="Back-End">
+      <title>Back End</title>
+
+      <para>Cetus does not contain a code generator. It is a source-to-source
+      compiler, and so it relies on other compilers (such as GCC, Intel or
+      Microsoft compiler) to compile the source code it outputs. It is
+      possible that in the future a back end could be added to Cetus, but for
+      research purposes other compilers are more suited to back end
+      optimization work.</para>
+    </sect1>
+  </chapter>

@@ -1,0 +1,534 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<chapter xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xmlns:svg="http://www.w3.org/2000/svg"
+      xmlns:mml="http://www.w3.org/1998/Math/MathML"
+      xmlns:html="http://www.w3.org/1999/xhtml"
+      xml:id="Optimization-and-Analysis-Passes">
+    <title>Optimization and Analysis Passes</title>
+
+    <sect1>
+      <title>Data Dependence Analysis</title>
+
+      <para>Data dependence analysis is a memory disambiguation technique
+      through which a compiler tries to establish dependence relations between
+      scalar variables or between array accesses in a program. The existence
+      of dependences or of independence, provides essential information for
+      further analysis and legal transformations such as loop parallelization,
+      loop tiling, loop interchange and so on.</para>
+
+      <para>Cetus implements an array data dependence testing framework that
+      includes loop-based affine array-subscript testing. The focus of this
+      implementation is towards automatic loop parallelization. This framework
+      acts as a wrapper around the conventional data-dependence test; we
+      currently use the Banerjee-Wolfe inequalities (Optimizing Supercompilers
+      for Supercomputers, Michael Wolfe) as our default dependence test. The
+      wrap-around framework provides Cetus with the flexibility of including
+      other dependence tests, thereby improving the scope of our
+      implementation; (we provide the Range test since v1.1). A whole program
+      data-dependence graph provides the necessary output information and the
+      interface, to enable subsequent analyses and transformations.</para>
+
+      <para>Initially, the algorithm traverses all loops in the program IR and
+      each loop and its inner nest are tested for eligibility. The eligibility
+      check allows us to broaden/narrow the scope of the implementation.
+      Currently, the algorithm includes the following checks: <itemizedlist
+          mark="bullet">
+          <listitem>
+            <para>Canonical loops (Fortran DO loop format): This implements a
+            canonical check for the loop initial assignment expression, the
+            loop condition and the loop index increment statement</para>
+          </listitem>
+
+          <listitem>
+            <para>Function calls are supported with simple analysis. Known
+            function calls without side-effects can be added to a list of
+            parallelizable calls (e.g. system calls). We also support simple
+            interprocedural side-effect analysis</para>
+          </listitem>
+
+          <listitem>
+            <para>Control flow modifiers are not allowed (break statements can
+            be handled specially for parallelization)</para>
+          </listitem>
+
+          <listitem>
+            <para>The loop increment must be an integer constant (symbolic
+            increments are handled using range analysis)</para>
+          </listitem>
+        </itemizedlist></para>
+
+      <para>Loop information for all eligible loops is collected and stored
+      internally for further dependence analysis.</para>
+
+      <para>SYMBOLIC ANALYSIS SUPPORT: The Data dependence framework has added
+      substantial support for using range analysis in the case of symbolic
+      values. Range information is used to determine loop bounds and loop
+      increments during eligibility testing. In the case of symbolic bounds,
+      range information is used conservatively to test the maximum possible
+      range of values. Symbolic information is also used to simplify array
+      subscripts before they are provided to the Banerjee-Wolfe inequalities
+      for testing. This symbolic support thus adds great value to dependence
+      analysis, especially to the Banerjee test.</para>
+
+      <para>The algorithm then tests all array accesses within an entire loop
+      nest for independence. Arrays identified by AliasAnalysis as aliased are
+      currently assumed to be dependent in all directions for the enclosing
+      loops. Pairs of array accesses such that at least one of them is a write
+      access are provided as input to the dependence test which returns a set
+      of direction vectors corresponding to the common enclosing loop nest for
+      the pair of accesses (if independence could not be proved). These
+      direction vectors are then used to build a Data Dependence Graph (DDG)
+      for the loop nest.</para>
+
+      <para>The data dependence graph for each loop nest becomes a part of a
+      larger whole program based graph which is attached to the Program IR
+      object upon completion of dependence testing. This implementation is
+      new, and substantially different from release v1.0. For a user looking
+      to use dependence information in an analysis or transformation pass, a
+      reference to this DDG must be obtained from the Program object. A
+      comprehensive API is then available via DDGraph (see Cetus javadoc) to
+      extract dependence information related to loops. This implementation has
+      the advantage that dependence testing is run fewer times and a common
+      API is available to pass users. NOTE: However, it is the pass writer's
+      responsibility that after a transformation on the IR has been performed,
+      dependence testing must be re-run in order to create an up-to-date
+      version of the dependence graph which automatically replaces itself in
+      the Program IR.</para>
+    </sect1>
+
+    <sect1>
+      <title>Induction Variable Recognition and Substitution</title>
+
+      <para>Induction variable (IV) substitution pass recognizes and
+      substitutes induction variables in loops that take the form of
+      <literal>iv = iv + expr</literal>. This form of assignment prevents the
+      automatic parallelizer from performing analysis and code generation, due
+      to the data dependence on the assignment operation. Our IV pass detects
+      such induction variables and replaces them with equivalent expressions
+      in terms of relevant loop index variables. The scope of the IV pass is
+      up to detection and substitution of <emphasis>Generalized Inudction
+      Variables (GIV)</emphasis> with additive induction operations; it allows
+      multiple induction operations on a variable in a multiply nested loop,
+      and the increment expression should not contain any loop-variant
+      variables other than other induction variables. The following example
+      shows an input program and a transformed code with our IV pass.
+      <programlisting>
+    iv = 1;                         
+    for (i=0; i&lt;10; i++) {          iv = 1;
+      iv = iv+1;                    for (i=0; i&lt;10; i++) {
+      ... = iv;                       ... = 2+41*i;
+      for (j=0; j&lt;20; j++) {   --&gt;    for (j=0; j&lt;20; j++) {
+        iv += 2;                        ... = 4+41*i+2*j;
+        ... = iv;                     }
+      }                             }
+    }
+  </programlisting></para>
+    </sect1>
+
+    <sect1>
+      <title>Reduction Variable Recognition</title>
+
+      <para>Reduction pass performs reduction recognition for each ForLoop. It
+      generates cetus annotation in the form of "#pragma cetus reduction(...)"
+      Currently, it supports scalar (sum += ...), ArrayAccess (A[i] += ...),
+      and AccessExpression (A-&gt;x += ...) for reduction variable. If another
+      pass wants to access reduction information for a given statement, stmt,
+      Tools.getAnnotation(stmt, "cetus", "reduction") will return an object
+      that contains a reduction map.</para>
+    </sect1>
+
+    <sect1>
+      <title>Privatization</title>
+
+      <para>Array Privatization performs privatization analysis of the
+      program. It tries to find privatizable variables (scalars and arrays)
+      which are written first then read in a loop body. The high-level
+      algorithm in below describes the process of detecting privatizable
+      variables, both scalars and array sections, in a loop. The set
+      operations that appear in the algorithm are performed on the array
+      sections if the variable is an array. We use the power of symbolic
+      analysis techniques in Cetus to make the symbolic section operation
+      possible. For example, <literal>[1:m] (intersect) [1:n]</literal>
+      results in <literal>[1:n]</literal> if the expression comparison tool
+      with the value range set can decide <literal>n</literal> is less than or
+      equal to <literal>m</literal>.</para>
+
+      <para>The algorithm traverses a loop nest from the innermost to the
+      outermost loop. At each level, it first collects
+      <literal>definitions</literal> (write references) and
+      <literal>uses</literal> (read references) in the loop body. Uses that
+      are covered by prior definitions create privatizable variables (or array
+      sections) for the current loop. The other uses are <literal>upward
+      exposed</literal>, creating read references seen in the outer loop.
+      Second, the algorithm aggregates all these array sections over the loop
+      iteration space, creating the array sections that are private, written
+      and upward exposed for the entire loop. The aggregation for the written
+      sections (<literal>DEF</literal>) computes the must-defined regular
+      sections of the arrays over the entire loop iteration while the
+      aggregation of upward-exposed sections (<literal>UEU</literal>) requires
+      only the conservative value ranges of the sections (may-used sections).
+      This algorithm is a slightly simpler version of the one used in the
+      Polaris parallelizing compiler for Fortran77 programs.</para>
+
+      <programlisting>
+ procedure Privatization(L)
+
+   Input : Loop L
+   Output: DEF[L], UEU[L], PRI[L]
+   // DEF: Definded set
+   // USE: Used set
+   // UEU: Upward-exposed set
+   // PRI: Private variables
+   // (^): intersection, (v): union
+
+   foreach direct inner loop L' in L
+     (DEF[L'],USE[L']) = Privatization(L')
+
+   G(N,E) = BuildCFG(L)
+   // BuildCFG builds a CFG with the inner loops represented as super nodes
+
+   Iteratively solve data flow equation DEF for node n in N
+     DEFin[n] = (^) {DEFout[p], p in predecessors of n}
+     DEFout[n] = (DEFin[n]-KILL[n]) (v) DEF[n]
+
+   DEF[L] = {}
+   UEU[L] = {}
+   PRI[L] = CollectCandidates(L)
+   // CollectCandidates collects arrays with loop-invariant subscripts
+
+   foreach loop-exiting node e in N
+     DEF[L] = DEF[L] (^) DEFout[e]
+
+   foreach node n in N
+     UEU[L] = UEU[L] (v) (USE[n]-DEFin[n])
+
+   foreach variable v in UEU[L]
+     PRI[L] = PRI[L]-{v}
+
+   DEF[L] = AggregateDEF(DEF[L])
+   UEU[L] = AggregateUSE(UEU[L])
+   // AggregateDEF aggregates array sections in DEF (MUST set)
+   // AggregateUSE aggregates array sections in USE (MAY set)
+
+   return (DEF[L], UEU[L])
+
+ end
+ </programlisting>
+
+      <para>Array privatization is invoked by specifying the flag
+      <literal>-privatize</literal>, and the result is stored as an annotation
+      that contains the set of private variables. We do not consider a
+      variable with user-defined type as a candidate private variable, but
+      intend to widen the scope of the analysis in the future.</para>
+    </sect1>
+
+    <sect1>
+      <title>Points-to Analysis</title>
+
+      <para>Points-to analysis is a compile-time technique that helps identify
+      relationships between pointer variables and the memory locations that
+      they point to during program execution. Pointers are powerful
+      programming constructs and allow complex memory manipulation during
+      program execution through techniques such as pointer arithmetic and
+      dynamic memory allocation. Pointer relationships can thus be complex and
+      difficult to analyze at compile time. On the other hand, however, they
+      provide the benefit of simplifying various other compile time analyses
+      such as constant propagation, alias analysis in C programs that allow
+      extensive use of pointers. Cetus provides an advanced interprocedural
+      points-to analysis framework, and this section describes the
+      intraprocedural design of this framework. The goal of the points-to
+      analyzer is to identify the set of named or unnamed memory locations
+      that a pointer variable may point to.</para>
+
+      <para>The Cetus points-to analyzer is based on the design described in:
+      <emphasis>"A practical interprocedural alias analysis for an
+      optimizing/parallelizing C Compiler", M. Emami, Masters Thesis, McGill
+      University, 1993.</emphasis></para>
+
+      <para>A flow-sensitive approach is used for analyzing intraprocedural
+      pointer information. Within a procedure, pointer relationships are
+      created through explicit pointer assignment. Updates are also possible
+      through function calls. At the end of the iterative pointer information
+      update, once a fixed point is reached, the analyzer provides a map as
+      output. This maps every statement in the procedure to the points-to
+      information that exists before it, which will be made clear through
+      examples shown below. Thus, accurate pointer information is made
+      available at every point in the program. The output map is used by the
+      interprocedural framework, as described in Section (?).</para>
+
+      <para>The following sections provide an overview of the intraprocedural
+      implementation and describe the results through simple examples.</para>
+
+      <para>1) <emphasis>Points-to Representation:</emphasis> The analyzer
+      uses the Cetus Domain representation to handle points-to information.
+      Special data structures PointsToDomain and PointsToRel are used to
+      implement points-to relationships. These data structures use Cetus
+      Symbol information to uniquely identify memory locations. Source level
+      symbol information is available through the Symbol interface for named
+      locations. For unnamed locations such as heap allocated memory, string
+      literal locations, and other special locations, the analyzer uses a
+      special Symbol called AbstractLocation. The relationship also contains a
+      boolean value identifying whether the pointer relationship is
+      definitely(D) or only possibly(P) valid at that program point. Arrays
+      are handled by the analyzer conservatively, an array is considered as a
+      single memory location and every pointer pointing to or pointing into an
+      array is said to possibly(P) point to the single location array. This
+      helps in simplification of the analysis. Aggregate structures such as
+      structs are handled precisely as a combination of scalars, arrays and
+      other aggregate structures. We use a newly modified AccessSymbol to
+      handle structs.</para>
+
+      <para>The PointsToDomain represents a set of pointer relationships at
+      every program point. The analyzer uses NullDomain (already available in
+      Cetus) as a starting point for the analyzer and continues to build
+      relationships through forward dataflow analysis. The UniverseDomain is
+      provided as a conservative fall-back domain representation in case the
+      analyzer is unable to infer accurate information with regards to the
+      pointer relationships. The Universe is meant to represent the situation
+      where all pointers can be assumed to be pointing to all memory locations
+      in the program universe.</para>
+
+      <programlisting>
+int main(void)
+{
+        struct {
+                int *f1;
+        }x, *z;
+
+        int y[70], w;
+
+        /* [] */
+        z = &amp;x;
+        /* [(z,x,D)] */
+        (*z).f1 = &amp;w;
+        /* [(&lt;x.f1&gt;,w,D), (z,x,D)] */
+        x.f1 = &amp;y[0];
+        /* [(&lt;x.f1&gt;,y,P), (z,x,D)] */
+}
+</programlisting>
+
+      <para>2) <emphasis>Control Flow-Based Analysis:</emphasis> Cetus
+      implements a work-list based iterative data flow analyzer. The
+      intraprocedural driver obtains a control flow graph (see CFGraph) for
+      the procedure, this graph is statement based. Control flow constructs
+      such as loops, if-else statements, switch statements etc., are handled
+      through iterative traversal of the nodes of the control flow graph.
+      Points-to information is merged using PointsToDomain functionality, as
+      shown in the examples below. Here, relationships change from definite(D)
+      to possible(P) following a merge from different paths in the
+      program.</para>
+
+      <programlisting>
+int main(void)
+{
+        int a, b, c, i;
+        int *p1, *p2, **p3;
+
+        /* [] */
+        p1 = &amp;a;
+        /* [(p1,a,D)] */
+        p3 = &amp;p1;
+        /* [(p1,a,D), (p3,p1,D)] */
+        p2 = *p3;
+        /* [(p1,a,D), (p2,a,D), (p3,p1,D)] */
+        if (i &gt; 0)
+                /* [(p1,a,D), (p2,a,D), (p3,p1,D)] */
+                p1 = &amp;b;
+        else
+                /* [(p1,a,D), (p2,a,D), (p3,p1,D)] */
+                p1 = &amp;c;
+
+        /* [(p1,b,P), (p1,c,P), (p2,a,D), (p3,p1,D)] */
+        return;
+}
+</programlisting>
+
+      <para>3) <emphasis>Interprocedural analysis:</emphasis> The
+      interprocedural analysis of points-to relation was built upon the common
+      interprocedural framework introduced in the current version. The role of
+      the interprocedural analysis is to reflect the effect of entering or
+      returning from a called procedure, by appropriately renaming the
+      variables that appear in the points-to relations. The renaming algorithm
+      is quite similar to one that appears in the reference implementation,
+      but we adjusted the interprocedural driver so that it works on top of
+      our common IPA framework. Currently, the IPA points-to analysis does not
+      support full context sensitivity and gives up analysis of programs
+      containing function calls through function pointers. The following
+      example shows the result of interprocedural points-to analysis on a
+      simple program. <programlisting>
+int *x, y;
+int main()
+{
+        int *a;
+        a=&amp;y;
+            /* [(a,y,D)] */
+        x=&amp;y;
+            /* [(a,y,D), (x,y,D)] */
+        f(a);
+            /* [(a,y,D), (x,y,D)] */
+        return 0;
+}
+
+void f(int *m)
+{
+            /* [(m,y,D), (x,y,D)] */
+        g(m);
+            /* [(m,y,D), (x,y,D)] */
+        return;
+}
+
+void g(int *n)
+{
+            /* [(n,y,D), (x,y,D)] */
+        return;
+}
+</programlisting></para>
+
+      <para>4) <emphasis>Alias Analysis Support:</emphasis> Pointer
+      relationships obtained as a result, can be used to create alias sets for
+      that program point by identifying different pointers, or aliases,
+      pointing to the same memory locations. As described in detail in the
+      section on Alias Analysis, advanced interprocedural pointer information
+      is used to build alias sets for the requested program statement. Refer
+      to the Cetus API documentation for methods to access alias information
+      in user passes.</para>
+    </sect1>
+
+    <sect1>
+      <title>Alias Analysis</title>
+
+      <para>Alias analysis is a technique used to identify sets of program
+      variable names that may refer to the same memory location during program
+      execution. In C programs, aliases are created through the use of
+      pointers as well as reference parameter passing. Disambiguation of
+      variable names can be crucial to the accuracy and the effectiveness of
+      other analyses and transformations performed by the compiler. A
+      compile-time alias analysis would either be flow and/or context
+      sensitive or neither of the two. Cetus provides advanced flow-senstivity
+      and limited context-sensitivity when generating alias
+      information.</para>
+
+      <para>Advanced alias information is now provided in Cetus using the
+      result of interprocedural points-to analysis. This information is
+      flow-sensitive and hence, uses statement information. The result of the
+      points-to analyzer is a map from a Statement to points-to information
+      that exists right before the statement is executed. Pointer
+      relationships are used by the Alias Analysis pass to create alias sets,
+      which are obtained through a unification-based approach.</para>
+
+      <para>Alias information can be accessed by pass writers using a simple
+      API. The presence of alias can be checked using functions that return a
+      boolean value, after checking for aliasing between symbols. Refer to the
+      HIR documentation for more information on symbols.</para>
+    </sect1>
+
+    <sect1>
+      <title>Range Analysis</title>
+
+      <para>Range Analysis performs symbolic range propagation for the
+      programs by symbolically executing the program and abstracting the
+      values of integer variables with a symbolic bounds. The implementation
+      is based on Symbolic Range Propagation by Blume and Eigenmann, which was
+      implemented for the Fortran77 language.</para>
+
+      <para>The goal of Range Analysis is to collect, at each program
+      statement, a map from integer-typed scalar variables to their symbolic
+      value ranges, represented by a symbolic lower bound and an upper bound.
+      In other words, a symbolic value range expresses the relationship
+      between the variables that appear in the range. We use a similar
+      approach as in Symbolic Range Propagation in the Polaris parallelizing
+      compiler, with necessary adjustment for the C language, to compute the
+      set of value ranges before each statement. The set of value ranges at
+      each statement can be used in several ways. Pass writers can directly
+      query the symbolic bound of a variable or can compare two symbolic
+      expressions using the constraints given by the set of value
+      ranges.</para>
+
+      <para>The high-level algorithm performs fix-point iteration in two
+      phases when propagating the value ranges throughout the program. The
+      first phase applies widening operations at nodes that have incoming back
+      edges to guarantee the termination of the algorithm. The second phase
+      compensates the loss of information due to the widening operations by
+      applying narrowing operation to the node at which widening has occurred.
+      During the fix-point iteration, the value ranges are merged at nodes
+      that have multiple predecessors, and outgoing value ranges are computed
+      by symbolically executing the statement. Two typical types of program
+      semantics that cause such changes of value ranges are constraints from
+      conditional expressions and assignments to variables.</para>
+
+      <para>Range analysis returns a map from each statement to its
+      corresponding <literal></literal> that contains the set of valid value
+      ranges before each statement. The result of this analysis was verified
+      with the C benchmarks in the SPEC CPU2006 suite. Range analysis does not
+      handle integer overflow as it does not model the overflow but such cases
+      are rare in normal correct programs. Following example shows how to
+      invoke a range analyzer in a compiler pass:</para>
+
+      <programlisting>
+ import cetus.analysis.*;
+ ...
+ Map&lt;Statement, RangeDomain&gt; range_map = RangeAnalysis.getRanges(procedure);
+ RangeDomain range_domain = range_map.get(statement);
+ // range_domain now contains the set of value ranges for the statement.
+ range_domain.compare(expr1, expr2);
+ </programlisting>
+
+      <para>Following example shows a function and its range map created after
+      the range analysis. <programlisting>
+          int foo(int k)
+                  []                    
+          {                             
+                  []                    
+            int i, j;                   
+                  []                    
+            double a;                   
+                  []                    
+            for ( i=0; i&lt;10; ++i )      
+                  []                    
+            {                           
+                  [0&lt;=i&lt;=9]             
+              a=(0.5*i);                
+            }                           
+                  [i=10]                
+            j=(i+k);                    
+                  [i=10, j=(i+k)]       
+            return j;                   
+          }                             
+ </programlisting></para>
+
+      <para>Since version 1.2, interprocedural range analysis is provided as
+      an option to increase the accuracy of value ranges, which is still in
+      experimental state. The following example shows the effect of this
+      extension on the loop-parallelization pass. For this example, the Range
+      test was used instead of the default Banerjee-Wolfe test.
+      <programlisting>
+int main()                                int main()
+{                                         { ...
+  double a[100];                          }
+  foo(a, 0, 10);                          
+  return 0;                               void foo(double *a, int lb, int ub)
+}                                         {
+                                     --&gt;    int i;
+void foo(double *a, int lb, int ub)         #pragma cetus private(i)
+{                                           #pragma cetus parallel
+  int i;                                    #pragma omp parallel for private(i)
+  for (i=lb; i&lt;ub; i++) {                   for (i=lb; i&lt;ub; i++) {
+    a[i] = a[i+10];                           a[i] = a[i+10];
+  }                                         }
+}                                         }
+</programlisting></para>
+    </sect1>
+
+    <sect1>
+      <title>OpenMP</title>
+
+      <para>Cetus parses OpenMP programs and creates an internal data
+      structure to hold the information in the OpenMP constructs. This
+      internal data structure is stored in Annotation and inserted into IR
+      wrapped inside an AnnotationStatement. Tools.java contains useful
+      utility functions that provide access to the AnnotationStatement in the
+      IR. Current Cetus supports OpenMP 3.0 specification.</para>
+    </sect1>
+  </chapter>
