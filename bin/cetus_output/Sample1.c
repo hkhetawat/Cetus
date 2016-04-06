@@ -34,7 +34,6 @@ int main()
 			completed[0]=true;
 		}
 	}
-	A=5;
 	_ret_val_0=0;
 	return _ret_val_0;
 }

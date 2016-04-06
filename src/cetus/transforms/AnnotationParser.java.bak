@@ -8,7 +8,6 @@ import cetus.application.IPChainAnalysis;
 
 import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.List;
 
 /**
 * This pass is used to parse external annotations that might be
@@ -295,19 +294,12 @@ class ProtectPragmaParser
 	public WhileLoop protectLoop;
 	public LinkedList<ProtectPragmaParser> chainedPragmas;
 	public static LinkedList<ProtectPragmaParser> rootPeerPragmas;
-	public LinkedList<Statement> normalStatements;
-	public LinkedList<Statement> toRemove;
-	public static WhileLoop finalLoop;
 	private String[] token_array;
 	private Traversable annotObj;
 	private CompoundStatement parent_stmt;
 	private Statement curr_annot_parent_stmt;
 	int completedID;
-	private static Statement firstAnnot = null;
-    public static IPChainAnalysis ipa;
-    public Identifier idAnnot;
-    public ProtectPragmaParser parent;
-
+	
     private static String modifyAnnotationString(String old_annotation_str) 
 	{
         String str = null;
@@ -328,28 +320,14 @@ class ProtectPragmaParser
         str = old_annotation_str;
         return str;
     }
-
-    public static int findChaining(ProtectPragmaParser x, ProtectPragmaParser context)
-    {
-        HashMap<String, String> checkers = x.parseCheckers(x.token_array);
-
-        if(context.idAnnot == null)
-            return -1;
-        for(String name : checkers.keySet())
-        {
-            if (name.equals(context.idAnnot.toString()))
-                return context.completedID;
-        }
-        return -1;
-    }
-
+	
 	public static void start(Program program)
 	{
         // Iterate over the program in Depth First order and search for
         // Annotations
         DFIterator<Traversable> iter = new DFIterator<Traversable>(program);
 		Boolean continueFlag = false;
-		ipa = new IPChainAnalysis(program);
+		IPChainAnalysis ipa = new IPChainAnalysis(program);
 		rootPeerPragmas = new LinkedList<ProtectPragmaParser>();
 		CompoundStatement parentCompletedPosition = null;
 		ProtectPragmaParser context = null;
@@ -376,82 +354,46 @@ class ProtectPragmaParser
                         Statement curr_annot_parent_stmt = (Statement)curr_annot_parent;
 						
 						if(parentCompletedPosition == null)
-						{
 							parentCompletedPosition = parent_stmt;
-							firstAnnot = curr_annot_parent_stmt;
-						}
-
-                        ProtectPragmaParser x = new ProtectPragmaParser(token_array, iter, parent_stmt, curr_annot_parent_stmt, completedArrayCount);
-
-                        int chainID;
-						if (context == null)
-                        {
-                            continueFlag = false;
-                        }
-                        else
-                        {
-                            chainID = findChaining(x, context);
-                            if  (chainID == -1)
-                                continueFlag = false;
-                            else continueFlag = true;
-                        }
-
+						
 						if(continueFlag == false)
 						{
-                            x.parent = null;
-							context = x;
+							context = new ProtectPragmaParser(token_array, iter, parent_stmt, curr_annot_parent_stmt, completedArrayCount);
 							rootPeerPragmas.add(context);
 						}
 						else 
 						{
 							System.out.println("Chaining pragmas.");
+							ProtectPragmaParser x = new ProtectPragmaParser(token_array, iter, parent_stmt, curr_annot_parent_stmt, completedArrayCount);
 							context.chainedPragmas.add(x);
-                            x.parent = context;
 							context = x;
 						}
 						
 						completedArrayCount++;
 						
                     	System.out.println("Found persiDS pragma with parent - " + curr_annot_parent);
+						continueFlag = false;
+						for(String token : token_array)
+						{
+							if(token.equals("Continue"))
+								continueFlag = true;
+						}
                     	continue;
                     }
 				} 
             } 
-			else if (obj instanceof ExpressionStatement)
-			{
-				System.out.println("Statement: " + (Statement)obj + ((Statement)obj).getClass());
-				if(context != null)
-				{
-					context.normalStatements.add((Statement)obj);
-					context.toRemove.add((Statement)obj);
-				}
-				continue;
-			}
         }
 		VariableDeclarator completedArrayDeclarator = new VariableDeclarator(new Identifier("completed"), new ArraySpecifier(new IntegerLiteral(completedArrayCount)));
 		VariableDeclaration completedArrayDeclaration = new VariableDeclaration(Specifier.BOOL, completedArrayDeclarator);
 		completedArrayDeclaration.setParent(null);
 		parentCompletedPosition.addDeclaration(completedArrayDeclaration);
-		for(int i = 0; i < completedArrayCount; i++)
-		{
-			AssignmentExpression assignFarExpression = new AssignmentExpression(new ArrayAccess(new Identifier("completed"), new IntegerLiteral(i)), AssignmentOperator.NORMAL, new BooleanLiteral(false));
-			ExpressionStatement assignFarStatement = new ExpressionStatement(assignFarExpression);
-			parentCompletedPosition.addStatementBefore(firstAnnot, assignFarStatement);
-		}
 		
 		for(ProtectPragmaParser x : rootPeerPragmas)
 		{
-			finalLoop = null;
 			x.emitCode(null);
-			AssignmentExpression assignExpression = new AssignmentExpression(new ArrayAccess(new Identifier("completed"), new IntegerLiteral(x.completedID)), AssignmentOperator.NORMAL, new BooleanLiteral(false));
-			ExpressionStatement assignStatement = new ExpressionStatement(assignExpression);
-			//x.parent_stmt.addStatementBefore(x.curr_annot_parent_stmt, assignStatement);
-			//x.protectLoop.setParent(null);
-            x.parent_stmt.addStatementBefore(x.curr_annot_parent_stmt, finalLoop);
+            x.parent_stmt.addStatementBefore(x.curr_annot_parent_stmt, x.protectLoop);
             x.parent_stmt.removeChild(x.curr_annot_parent_stmt);
 		}
-		ProtectPragmaParser y = rootPeerPragmas.get(0);
-		
 	}
 	
 	private HashMap<String, String> parseCheckers(String[] tokenArray)
@@ -487,45 +429,14 @@ class ProtectPragmaParser
 	public ProtectPragmaParser(String[] token_array, DFIterator<Traversable> iter, CompoundStatement parent_stmt, Statement curr_annot_parent_stmt, int completedID)
 	{
 		chainedPragmas = new LinkedList<ProtectPragmaParser>();
-		normalStatements = new LinkedList<Statement>();
-		toRemove = new LinkedList<Statement>();
 		this.token_array = token_array;
 		this.annotObj = iter.next();
 		this.parent_stmt = parent_stmt;
 		this.curr_annot_parent_stmt = curr_annot_parent_stmt;
 		this.completedID = completedID;
-
-        ExpressionStatement expAnnot = (ExpressionStatement)annotObj;
-        if(!(expAnnot.getExpression() instanceof AssignmentExpression))
-            idAnnot = null;
-        else
-        {
-            AssignmentExpression assAnnot = (AssignmentExpression)expAnnot.getExpression();
-            Expression lhsAnnot = assAnnot.getLHS();
-            idAnnot = (Identifier) lhsAnnot;
-        }
 	}
 	
-	public void chain(ProtectPragmaParser loop, VariableDeclaration checkArrayDeclaration, DoLoop checkLoop, IfStatement completedIf, BinaryExpression protectCondition)
-	{
-		CompoundStatement whileBlock = new CompoundStatement();
-		whileBlock.addDeclaration(checkArrayDeclaration);
-		//protectLoopNext.setParent(null);
-		whileBlock.addStatement(loop.protectLoop);
-		for(Statement x:loop.normalStatements)
-		{
-			x.setParent(null);
-			parent_stmt.removeChild(x);
-			whileBlock.addStatement(x);
-		}
-		whileBlock.addStatement(checkLoop);
-		whileBlock.addStatement(completedIf);
-		protectLoop = new WhileLoop(protectCondition, whileBlock);
-		finalLoop = protectLoop;
-		System.out.println(protectLoop);
-	}
-	
-	public void emitCode(ProtectPragmaParser loop)
+	public void emitCode(WhileLoop loop)
 	{	
 		HashMap<String, String> checkers = parseCheckers(token_array);
 		HashMap<String, LinkedList<String>> recoverers = parseRecoverers(token_array);
@@ -545,8 +456,11 @@ class ProtectPragmaParser
 		VariableDeclaration checkArrayDeclaration = new VariableDeclaration(Specifier.BOOL, checkArrayDeclarator);
 		checkArrayDeclaration.setParent(null);
 		
-		//CompoundStatement whileBlock = new CompoundStatement();
-		//whileBlock.addDeclaration(checkArrayDeclaration);
+		CompoundStatement whileBlock = new CompoundStatement();
+		whileBlock.addDeclaration(checkArrayDeclaration);
+		
+		if(loop != null)
+			whileBlock.addStatement(loop);
 		
 		Statement annotStatement = (Statement)annotObj;
 		parent_stmt.removeChild(annotStatement);
@@ -568,41 +482,19 @@ class ProtectPragmaParser
 			ExpressionStatement assignStatement = new ExpressionStatement(assignExpression);
 			doWhileBlock.addStatement(assignStatement);
 			
-			BinaryExpression completeRecCondition = null;
-			for(String recFunction : recoverers.get(key))
-			{
-				String recParts[] = recFunction.split("\\(");
-				String recFunctionName = recParts[0];
-				String recArguements = recParts[1].split("\\)")[0];
+			String recFunction = recoverers.get(key).get(0);
+			String recParts[] = recFunction.split("\\(");
+			String recFunctionName = recParts[0];
+			String recArguements = recParts[1].split("\\)")[0];
 			
-				FunctionCall recCall = new FunctionCall(new Identifier(recFunctionName), new Identifier(recArguements));
-				BinaryExpression recCondition = new BinaryExpression(recCall, BinaryOperator.COMPARE_EQ, new BooleanLiteral(false));
-				
-				if(completeRecCondition == null)
-				{
-					completeRecCondition = recCondition;
-				}
-				else
-				{
-					completeRecCondition = new BinaryExpression(completeRecCondition, BinaryOperator.LOGICAL_AND, recCondition);
-				}
-			}
+			FunctionCall recCall = new FunctionCall(new Identifier(recFunctionName), new Identifier(recArguements));
+			BinaryExpression recCondition = new BinaryExpression(recCall, BinaryOperator.COMPARE_EQ, new BooleanLiteral(false));
 			CompoundStatement ifRecBlock = new CompoundStatement();
-
-            if(parent != null && key.equals(parent.idAnnot.toString()))
-            {
-                AssignmentExpression chainAssign = new AssignmentExpression(new ArrayAccess(new Identifier("completed"), new IntegerLiteral(parent.completedID)), AssignmentOperator.NORMAL, new BooleanLiteral(false));
-                ExpressionStatement chainStatement = new ExpressionStatement(chainAssign);
-                ifRecBlock.addStatement(chainStatement);
-            }
-            else
-            {
-                ThrowExpression throwUnrecoverable = new ThrowExpression(new Identifier("unrecoverable"));
-                ExpressionStatement throwStatement = new ExpressionStatement(throwUnrecoverable);
-                ifRecBlock.addStatement(throwStatement);
-            }
+			ThrowExpression throwUnrecoverable = new ThrowExpression(new Identifier("unrecoverable"));
+			ExpressionStatement throwStatement = new ExpressionStatement(throwUnrecoverable);
+			ifRecBlock.addStatement(throwStatement);
 			
-			IfStatement recIf = new IfStatement(completeRecCondition, ifRecBlock);
+			IfStatement recIf = new IfStatement(recCondition, ifRecBlock);
 			
 			BinaryExpression checkSingleCondition = new BinaryExpression(new ArrayAccess(new Identifier("check"), new IntegerLiteral(i)), BinaryOperator.COMPARE_EQ, new BooleanLiteral(false));
 			CompoundStatement ifCheckBlock = new CompoundStatement();
@@ -624,7 +516,7 @@ class ProtectPragmaParser
 		
 		DoLoop checkLoop = new DoLoop(doWhileBlock, checkCondition);
 		
-		//whileBlock.addStatement(checkLoop);
+		whileBlock.addStatement(checkLoop);
 		
 		BinaryExpression completeCondition = new BinaryExpression(new ArrayAccess(new Identifier("check"), new IntegerLiteral(0)), BinaryOperator.COMPARE_EQ, new BooleanLiteral(true));
 		for(i = 1; i < checkers.size(); i++)
@@ -638,35 +530,16 @@ class ProtectPragmaParser
 		ExpressionStatement assignStatement = new ExpressionStatement(assignExpression);
 		ifCompleteBlock.addStatement(assignStatement);
 		IfStatement completedIf = new IfStatement(completeCondition, ifCompleteBlock);
-		//whileBlock.addStatement(completedIf);
+		whileBlock.addStatement(completedIf);
 		
 		BinaryExpression protectCondition = new BinaryExpression(new ArrayAccess(new Identifier("completed"), new IntegerLiteral(completedID)), BinaryOperator.COMPARE_EQ, new BooleanLiteral(false));
-		//protectLoop = new WhileLoop(protectCondition, whileBlock);
-		
-		if(loop == null)
-		{
-			CompoundStatement whileBlock = new CompoundStatement();
-			whileBlock.addDeclaration(checkArrayDeclaration);
-			whileBlock.addStatement(checkLoop);
-			whileBlock.addStatement(completedIf);
-			protectLoop = new WhileLoop(protectCondition, whileBlock);
-			finalLoop = protectLoop;
-		}
-		else
-		{
-			this.chain(loop, checkArrayDeclaration, checkLoop, completedIf, protectCondition);
-			//loop.chain(checkArrayDeclaration, checkLoop, completedIf, protectCondition);
-			//protectLoop = loop.protectLoop;
-		}
+		protectLoop = new WhileLoop(protectCondition, whileBlock);
 
 		for(ProtectPragmaParser x : chainedPragmas)
 		{
-			x.emitCode(this);
-			AssignmentExpression assignFarExpression = new AssignmentExpression(new ArrayAccess(new Identifier("completed"), new IntegerLiteral(x.completedID)), AssignmentOperator.NORMAL, new BooleanLiteral(false));
-			ExpressionStatement assignFarStatement = new ExpressionStatement(assignFarExpression);
-			//x.parent_stmt.addStatementBefore(firstAnnot, assignFarStatement);
+			x.emitCode(protectLoop);
             x.parent_stmt.removeChild(x.curr_annot_parent_stmt);
-			//protectLoop = x.protectLoop;
+			protectLoop = x.protectLoop;
 		}
 	}
 }
